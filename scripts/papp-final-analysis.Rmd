@@ -19,8 +19,9 @@ library(cowplot)
 Read in ground cover data.
 
 ```{r}
-papp_ground <- read_xlsx(path = "PappFieldData.xlsx", sheet = 2)
-papp_species <- read.csv("Species_List.csv")
+#papp_ground <- read_xlsx(path = "PappFieldData.xlsx", sheet = 2)
+papp_ground <- read_xlsx(path = "../data/PappFieldData.xlsx", sheet = 2)
+papp_species <- read.csv("../data/Species_List.csv")
 papp_ground <- left_join(papp_ground, papp_species, by = "Species")
 
 # Change order of ecological conditions
@@ -78,7 +79,7 @@ kable(anova(canopy_dens_lm_all), digits = 3, format = "pandoc", caption = "ANOVA
 
 * Perform a t-test to check for differences in Canopy Density at Adjacent Trails
 
-```{r}
+```{r, eval=FALSE}
 with(canopy_dens, kable(t.test(Canopy_Density_Adj_Trail ~ Site)))
 ```
 
@@ -93,7 +94,8 @@ TukeyHSD(canopy_dens_aov)
 * Read in Tree data
 
 ```{r}
-papp_trees <- read_xlsx(path = "PappFieldData.xlsx", sheet = 1)
+#papp_trees <- read_xlsx(path = "PappFieldData.xlsx", sheet = 1)
+papp_trees <- read_xlsx(path = "../data/PappFieldData.xlsx", sheet = 1)
 # Filter out the dead trees
 papp_trees <- papp_trees %>% 
   filter(!grepl(pattern = "dead", papp_trees$Species))
@@ -602,11 +604,15 @@ t.test(data = ground_beta_bray_temp, ground_beta_bray~Site.x)
 Now let's look for differences also based on edge vs interior
 
 ```{r}
-ground_beta_bray_temp <- filter(ground_beta_bray_df_long, Site.x == Site.y, Location.x == Location.y)
-ggplot(data = ground_beta_bray_temp, aes(x = Site.x, y = ground_beta_bray, fill = Location.x)) +
+ground_beta_bray_temp <- filter(ground_beta_bray_df_long, Site.x == Site.y, Location.x == Location.y, EcoCondition.x == EcoCondition.y)
+ggplot(data = ground_beta_bray_temp, aes(x = Location.x, y = ground_beta_bray, fill = EcoCondition.x)) +
   geom_boxplot() +
   ylab("Bray-Curtis Value") + 
-  xlab("Site") +
+  xlab("Location") +
+  facet_grid(Site.x~.) +
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
   theme_bw(base_family = "Times")
 ggsave("../manuscript/figures/Figure-16-Bray-Veg-Loc.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
@@ -614,12 +620,12 @@ ggsave("../manuscript/figures/Figure-16-Bray-Veg-Loc.tiff", device = "tiff", wid
 Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
 
 ```{r}
-kable(anova(lm(data = ground_beta_bray_temp, ground_beta_bray ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Bray-Curtis of Total Ground Vegetation")
+kable(anova(lm(data = ground_beta_bray_temp, ground_beta_bray ~ Site.x * Location.x * EcoCondition.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Bray-Curtis of Total Ground Vegetation")
 ```
 
 * Pair-wise comparisons for clarity
 ```{r}
-Bray_Ground_aov <- aov(data = ground_beta_bray_temp, ground_beta_bray~ Site.x * Location.x )
+Bray_Ground_aov <- aov(data = ground_beta_bray_temp, ground_beta_bray~ Site.x * Location.x * EcoCondition.x )
 TukeyHSD(Bray_Ground_aov)
 ```
 
@@ -680,11 +686,15 @@ t.test(data = native_ground_beta_bray_temp, native_ground_beta_bray~Site.x)
 Now let's look for differences also based on edge vs interior
 
 ```{r}
-native_ground_beta_bray_temp <- filter(native_ground_beta_bray_df_long, Site.x == Site.y, Location.x == Location.y)
-ggplot(data = native_ground_beta_bray_temp, aes(x = Site.x, y = native_ground_beta_bray, fill = Location.x)) +
+native_ground_beta_bray_temp <- filter(native_ground_beta_bray_df_long, Site.x == Site.y, Location.x == Location.y, EcoCondition.x == EcoCondition.y)
+ggplot(data = native_ground_beta_bray_temp, aes(x = Location.x, y = native_ground_beta_bray, fill = EcoCondition.x)) +
   geom_boxplot() +
   ylab("Bray-Curtis Value") + 
-  xlab("Site") +
+  xlab("Location") +
+  facet_grid(Site.x~.) +
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
   theme_bw(base_family = "Times")
 ggsave("../manuscript/figures/Figure-20-Bray-Nat-Veg-Loc.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
@@ -692,12 +702,12 @@ ggsave("../manuscript/figures/Figure-20-Bray-Nat-Veg-Loc.tiff", device = "tiff",
 Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
 
 ```{r}
-kable(anova(lm(data = native_ground_beta_bray_temp, native_ground_beta_bray ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Bray-Curtis for Native Ground Vegetation")
+kable(anova(lm(data = native_ground_beta_bray_temp, native_ground_beta_bray ~ Site.x * Location.x * EcoCondition.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Bray-Curtis for Native Ground Vegetation")
 ```
 
 * Pair-wise comparisons for clarity
 ```{r}
-Bray_Nat_Ground_aov <- aov(data = native_ground_beta_bray_temp, native_ground_beta_bray~ Site.x * Location.x )
+Bray_Nat_Ground_aov <- aov(data = native_ground_beta_bray_temp, native_ground_beta_bray~ Site.x * Location.x * EcoCondition.x)
 TukeyHSD(Bray_Nat_Ground_aov)
 ```
 
