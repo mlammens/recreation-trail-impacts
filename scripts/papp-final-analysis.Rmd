@@ -19,8 +19,8 @@ library(cowplot)
 Read in ground cover data.
 
 ```{r}
-papp_ground <- read_xlsx(path = "../data/PappFieldData.xlsx", sheet = 2)
-papp_species <- read.csv("../data/Species_List.csv")
+papp_ground <- read_xlsx(path = "PappFieldData.xlsx", sheet = 2)
+papp_species <- read.csv("Species_List.csv")
 papp_ground <- left_join(papp_ground, papp_species, by = "Species")
 
 # Change order of ecological conditions
@@ -54,8 +54,7 @@ ggplot(data = canopy_dens, aes(x = Location, y = Canopy_Density, fill = EcoCondi
                       breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
                       labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-3-CanDens-Loc-Site.png", device = "png", width = 6.5, height = 4, units = "in")
-
+ggsave("../manuscript/figures/Figure-3-CanDens-Loc-Site.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 * Plot Canopy Density of Adjacent Trails using ggplot to split by site
@@ -65,7 +64,7 @@ ggplot(data = canopy_dens, aes(x = Site, y = Canopy_Density_Adj_Trail)) +
   geom_boxplot() +
   ylab("Canopy Density on Trail") + 
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-4-CanDens-Adj.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-4-CanDens-Adj.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 ## Statistical Analysis
@@ -83,12 +82,18 @@ kable(anova(canopy_dens_lm_all), digits = 3, format = "pandoc", caption = "ANOVA
 with(canopy_dens, kable(t.test(Canopy_Density_Adj_Trail ~ Site)))
 ```
 
+* Pair-wise comparisons for clarity
+```{r}
+canopy_dens_aov <- aov(data = canopy_dens, Canopy_Density ~ Site * Location * EcoCondition )
+TukeyHSD(canopy_dens_aov)
+```
+
 # Diameter at Breast Height Analysis
 
 * Read in Tree data
 
 ```{r}
-papp_trees <- read_xlsx(path = "../data/PappFieldData.xlsx", sheet = 1)
+papp_trees <- read_xlsx(path = "PappFieldData.xlsx", sheet = 1)
 # Filter out the dead trees
 papp_trees <- papp_trees %>% 
   filter(!grepl(pattern = "dead", papp_trees$Species))
@@ -113,7 +118,7 @@ ggplot(data = papp_trees, aes(x = Location, y = DBH, fill = EcoCondition)) +
                       breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
                       labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-4-DBH-Loc-Site.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-4-DBH-Loc-Site.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 ## Analysis of Variance
@@ -123,6 +128,12 @@ ggsave("../manuscript/figures/Figure-4-DBH-Loc-Site.png", device = "png", width 
 ```{r}
 DBH_lm_all <- lm(data = papp_trees, DBH ~ Site * Location * EcoCondition )
 kable(anova(DBH_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of DBH")
+```
+
+* Pair-wise comparisons for clarity
+```{r}
+DBH_aov <- aov(data = papp_trees, DBH ~ Site * Location * EcoCondition )
+TukeyHSD(DBH_aov)
 ```
 
 # Analysis of Total Plant Species Richness based on Ground Cover data
@@ -141,6 +152,14 @@ library(vegan)
 
 ```{r}
 ground_veg <- papp_ground[ !(papp_ground$Species %in% c("Bare ground")), ]
+```
+
+* Look at number of plant species in each plot
+```{r}
+plants_tally <- 
+  ground_veg %>%
+  group_by(Site, Plot_Num, Location, EcoCondition) %>%
+  tally()
 ```
 
 * Look at number of native and invasive plants at each plot
@@ -175,7 +194,7 @@ ggplot(data = nat_inv_plants_tally, aes(x = Location, y = n, fill = EcoCondition
                       breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
                       labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-6-PlantRichness-Loc-Site.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-6-PlantRichness-Loc-Site.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 
@@ -186,6 +205,12 @@ ggsave("../manuscript/figures/Figure-6-PlantRichness-Loc-Site.png", device = "pn
 ```{r}
 nat_inv_plant_tally_lm_all <- lm(data = nat_inv_plants_tally, n ~ Site * Location * EcoCondition * Inv_Nat )
 kable(anova(nat_inv_plant_tally_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Plant Species Richness")
+```
+
+* Pair-wise comparisons for clarity
+```{r}
+Species_Richness_aov <- aov(data = nat_inv_plants_tally, n ~ Site * Location * EcoCondition )
+TukeyHSD(Species_Richness_aov)
 ```
 
 # Analysis of Total Relative Percent Cover by Site, Location, EcoCondition, and Invasive/Native
@@ -235,7 +260,7 @@ ggplot(data = papp_ground_cover_summary, aes(x = Location, y = Tot_Rel_Perc_Cove
                       breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
                       labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-7-RelCov-Loc-Site.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-7-RelCov-Loc-Site.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 ## Statistical Analysis
@@ -245,6 +270,12 @@ ggsave("../manuscript/figures/Figure-7-RelCov-Loc-Site.png", device = "png", wid
 ```{r}
 inv_nat_tot_rel_cover_lm_all <- lm(data = papp_ground_cover_summary, Tot_Rel_Perc_Cover ~ Site * Location * EcoCondition * Inv_Nat )
 kable(anova(inv_nat_tot_rel_cover_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Total Relative Percent Cover")
+```
+
+* Pair-wise comparisons for clarity
+```{r}
+Tot_Rel_Cov_aov <- aov(data = papp_ground_cover_summary, Tot_Rel_Perc_Cover ~ Site * Location * EcoCondition )
+TukeyHSD(Tot_Rel_Cov_aov)
 ```
 
 # Analysis of Total Percent Cover by Site, Location, EcoCondition, and Invasive/Native
@@ -262,7 +293,7 @@ ggplot(data = papp_ground_cover_summary, aes(x = Location, y = Tot_Perc_Cover, f
                       breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
                       labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-8-Cov-Loc-Site.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-8-Cov-Loc-Site.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 ## Statistical Analysis
@@ -274,6 +305,68 @@ inv_nat_tot_cover_lm_all <- lm(data = papp_ground_cover_summary, Tot_Perc_Cover 
 kable(anova(inv_nat_tot_cover_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Total Percent Cover")
 ```
 
+*Pair-wise comparisons for clarity
+```{r}
+Tot_Perc_Cover_aov <- aov(data = papp_ground_cover_summary, Tot_Perc_Cover ~ Site * Location * EcoCondition )
+TukeyHSD(Tot_Perc_Cover_aov)
+```
+
+# Shannon Index of Dissimilarity for Tree Data
+
+```{r}
+tree_species_tally <- 
+  papp_trees %>%
+  group_by(Species, Site, Plot_Num, Location, EcoCondition) %>%
+  tally()
+```
+
+* Use 'Spread' function to match the model set by BCI data
+
+```{r}
+tree_spread <- tree_species_tally %>%
+  spread(Species, n, convert = TRUE)
+```
+
+* Remove Unnecessary Variables, Set 'N/A' values to Zero, Set Row Names to Plot Number
+
+```{r}
+trees_BCI <- tree_spread[, !(colnames(tree_spread) %in% c("Site", "Location", "EcoCondition"))] ;
+  trees_BCI[is.na(trees_BCI <- trees_BCI)] <- 0 ;
+   
+trees_BCI <- data.frame(trees_BCI, row.names = 1)
+```
+
+* Use 'diversity' function to find the Shannon Values for each plot and calculate the mean
+
+```{r}
+shannon_trees <- diversity(trees_BCI)
+canopy_dens$shannon_trees <- shannon_trees
+```
+
+## Visualize the Data
+
+* Plot values using a boxplot for Shannon Index
+
+```{r}
+ggplot(data = canopy_dens, aes(x = Location, y = shannon_trees, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site ~ .)
+```
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Shannon Index of Trees at Sites, Locations, and EcoConditions
+
+```{r}
+canopy_dens_sh_all <- lm(data = canopy_dens, shannon_trees ~ Site * Location * EcoCondition )
+kable(anova(canopy_dens_sh_all), digits = 3, format = "pandoc", caption = "ANOVA table of Shannon Index of Trees")
+```
+
+* Pair-wise comparisons for clarity
+```{r}
+Shan_trees_aov <- aov(data = canopy_dens, shannon_trees ~ Site * Location * EcoCondition )
+TukeyHSD(Shan_trees_aov)
+```
 # Shannon Index of Dissimilarity for Plant Data
 
 * Use 'Spread' function to match the model set by BCI data
@@ -312,7 +405,7 @@ ggplot(data = plants_tally, aes(x = Location, y = shannon_ground, fill = EcoCond
                       breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
                       labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-9-Shan-Loc-Site.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-9-Shan-Loc-Site.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 ## Statistical Analysis
@@ -324,7 +417,13 @@ papp_ground_sh_all <- lm(data = plants_tally, shannon_ground ~ Site * Location *
 kable(anova(papp_ground_sh_all), digits = 3, format = "pandoc", caption = "ANOVA table of Shannon Index of Plants")
 ```
 
-# Shannon Index of Dissimilarity for Plant Data
+* Pair-wise comparisons for clarity
+```{r}
+Shan_ground_aov <- aov(data = plants_tally, shannon_ground ~ Site * Location * EcoCondition )
+TukeyHSD(Shan_ground_aov)
+```
+
+# Shannon Index of Dissimilarity for Native Plant Data
 
 * Use 'Spread' function to match the model set by BCI data
 
@@ -363,16 +462,22 @@ ggplot(data = plants_tally, aes(x = Location, y = native_shannon_ground, fill = 
                       breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
                       labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-10-Nat-Shan-Loc-Site.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-10-Nat-Shan-Loc-Site.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 ## Statistical Analysis
 
-* Perform an ANOVA to check for differences in Shannon Index of Plants at Sites, Locations, and EcoConditions
+* Perform an ANOVA to check for differences in Shannon Index of Native Plants at Sites, Locations, and EcoConditions
 
 ```{r}
 papp_ground_sh_all <- lm(data = plants_tally, native_shannon_ground ~ Site * Location * EcoCondition )
 kable(anova(papp_ground_sh_all), digits = 3, format = "pandoc", caption = "ANOVA table of Shannon Index of Plants")
+```
+
+* Pair-wise comparisons for clarity
+```{r}
+Shan_nat_ground_aov <- aov(data = plants_tally, native_shannon_ground ~ Site * Location * EcoCondition )
+TukeyHSD(Shan_nat_ground_aov)
 ```
 
 # Bray-Curtis Index Tree Data
@@ -404,7 +509,7 @@ ggplot(data = filter(beta_bray_df_long, Site.x == Site.y), aes(x = Site.x, y = b
   ylab("Bray-Curtis Value") + 
   xlab("Site") +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-11-Bray-Tree-Site.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-11-Bray-Tree-Site.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 Use a simple t-test to see if there are significant differences in turnover among plots between sites
@@ -423,7 +528,7 @@ ggplot(data = beta_bray_temp, aes(x = Site.x, y = beta_bray, fill = Location.x))
   ylab("Bray-Curtis Value") + 
   xlab("Site") +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-12-Bray-Tree-Loc.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-12-Bray-Tree-Loc.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
@@ -432,6 +537,13 @@ Perform an ANOVA on these data to see if there's a difference between sites and 
 kable(anova(lm(data = beta_bray_temp, beta_bray ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table")
 ```
 Nope
+
+* Pair-wise comparisons for clarity
+```{r}
+Bray_Tree_aov <- aov(data = beta_bray_temp, beta_bray ~ Site.x * Location.x )
+TukeyHSD(Bray_Tree_aov)
+```
+
 
 Now let's check turn-over between edges and interiors
 
@@ -442,7 +554,7 @@ ggplot(data = beta_bray_temp, aes(x = Site.x, y = beta_bray)) +
   ylab("Bray-Curtis Value") + 
   xlab("Site") +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-13-Bray-Tree-Turn-Loc.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-13-Bray-Tree-Turn-Loc.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 
 t.test(data = beta_bray_temp, beta_bray~Site.x)
 
@@ -477,7 +589,7 @@ ggplot(data = filter(ground_beta_bray_df_long, Site.x == Site.y), aes(x = Site.x
   ylab("Bray-Curtis Value") + 
   xlab("Site") +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-15-Bray-Veg.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-15-Bray-Veg.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 Use a simple t-test to see if there are significant differences in turnover among plots between sites
@@ -496,13 +608,19 @@ ggplot(data = ground_beta_bray_temp, aes(x = Site.x, y = ground_beta_bray, fill 
   ylab("Bray-Curtis Value") + 
   xlab("Site") +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-16-Bray-Veg-Loc.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-16-Bray-Veg-Loc.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
 
 ```{r}
 kable(anova(lm(data = ground_beta_bray_temp, ground_beta_bray ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Bray-Curtis of Total Ground Vegetation")
+```
+
+* Pair-wise comparisons for clarity
+```{r}
+Bray_Ground_aov <- aov(data = ground_beta_bray_temp, ground_beta_bray~ Site.x * Location.x )
+TukeyHSD(Bray_Ground_aov)
 ```
 
 Now let's check turn-over between edges and interiors
@@ -514,7 +632,7 @@ ggplot(data = ground_beta_bray_temp, aes(x = Site.x, y = ground_beta_bray)) +
   ylab("Bray-Curtis Value") + 
   xlab("Site") +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-17-Bray-Veg-Turn-Loc.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-17-Bray-Veg-Turn-Loc.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 
 t.test(data = ground_beta_bray_temp, ground_beta_bray~Site.x)
 
@@ -549,7 +667,7 @@ ggplot(data = filter(native_ground_beta_bray_df_long, Site.x == Site.y), aes(x =
   ylab("Bray-Curtis Value") + 
   xlab("Site") +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-19-Bray-Nat-Veg.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-19-Bray-Nat-Veg.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 Use a simple t-test to see if there are significant differences in turnover among plots between sites
@@ -568,13 +686,19 @@ ggplot(data = native_ground_beta_bray_temp, aes(x = Site.x, y = native_ground_be
   ylab("Bray-Curtis Value") + 
   xlab("Site") +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-20-Bray-Nat-Veg-Loc.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-20-Bray-Nat-Veg-Loc.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
 
 Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
 
 ```{r}
 kable(anova(lm(data = native_ground_beta_bray_temp, native_ground_beta_bray ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Bray-Curtis for Native Ground Vegetation")
+```
+
+* Pair-wise comparisons for clarity
+```{r}
+Bray_Nat_Ground_aov <- aov(data = native_ground_beta_bray_temp, native_ground_beta_bray~ Site.x * Location.x )
+TukeyHSD(Bray_Nat_Ground_aov)
 ```
 
 Now let's check turn-over between edges and interiors
@@ -586,7 +710,7 @@ ggplot(data = native_ground_beta_bray_temp, aes(x = Site.x, y = native_ground_be
   ylab("Bray-Curtis Value") + 
   xlab("Site") +
   theme_bw(base_family = "Times")
-ggsave("../manuscript/figures/Figure-21-Bray-Nat-Veg-Turn-Loc.png", device = "png", width = 6.5, height = 4, units = "in")
+ggsave("../manuscript/figures/Figure-21-Bray-Nat-Veg-Turn-Loc.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 
 
 t.test(data = native_ground_beta_bray_temp, native_ground_beta_bray~Site.x)
