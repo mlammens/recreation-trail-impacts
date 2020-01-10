@@ -1,0 +1,1965 @@
+---
+title: "Papp Preliminary Analysis"
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+---
+
+Load packages.
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(cowplot)
+```
+
+Read in ground cover data.
+
+```{r}
+papp_ground <- read_xlsx(path = "../data/PappFieldData.xlsx", sheet = 2)
+papp_species <- read.csv("../data/Species_List.csv")
+papp_ground <- left_join(papp_ground, papp_species, by = "Species")
+
+# Change order of ecological conditions
+papp_ground$EcoCondition <- factor(papp_ground$EcoCondition, 
+                                   levels = c("Disturbed", "Undisturbed", "Ecologically Significant"))
+
+```
+
+
+# Canopy Density Analysis
+
+* Collapse the data set so we have one canopy density value per plot
+
+```{r}
+canopy_dens <- 
+  papp_ground %>%
+  group_by(Site, Plot_Num, Location, EcoCondition) %>%
+  summarise(Canopy_Density = unique(Canopy_Density),
+            Canopy_Density_Adj_Trail = unique(Canopy_Density_Adjacent_Trail))
+```
+
+## Visualizing the data
+
+* Plot values using a boxplot Plot Canopy Density 
+
+```{r}
+fig_3a <- 
+  ggplot(data = canopy_dens, aes(x = Site, y = Canopy_Density, fill = Location)) +
+  geom_boxplot() +
+  xlab("Site") + 
+  ylab("Canopy Density") + 
+  theme_bw(base_family = "Times")
+print(fig_3a)
+
+```
+
+* Plot values using a boxplot Plot Canopy Density based on Eco Conditions
+
+```{r}
+fig_3b <-
+  ggplot(data = canopy_dens, aes(x = Site, y = Canopy_Density, fill = EcoCondition)) +
+  geom_boxplot() +
+  xlab("Site") + 
+  ylab("Canopy Density") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+print(fig_3b)
+```
+
+Make multi-panel figure
+
+```{r}
+plot_grid(fig_3a, fig_3b, labels = c("A", "B"), label_size = 12)
+ggsave("../manuscript/figures/Figure-3-CanDens-Site.tiff", device = "tiff", width = 6.5, height = 3.5, units = "in")
+```
+
+
+
+* Plot values using a boxplot Adjacent Canopy Density
+
+```{r}
+ggplot(data = canopy_dens, aes(x = Site, y = Canopy_Density_Adj_Trail)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot Plot Canopy Density based based on location
+
+```{r}
+ggplot(data = canopy_dens, aes(x = Location, y = Canopy_Density)) +
+  geom_boxplot()
+```
+* Plot values using a boxplot Plot Canopy Density based based on location and EcoCondition
+
+```{r}
+ggplot(data = canopy_dens, aes(x = Location, y = Canopy_Density, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot Plot Canopy Density based on Location, separated by Site
+
+```{r}
+ggplot(data = canopy_dens, aes(x = Location, y = Canopy_Density, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~.) +
+  ylab("Canopy Density") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+ggsave("../manuscript/figures/Figure-3-CanDens-Loc-Site.png", device = "png", width = 6.5, height = 4, units = "in")
+
+```
+
+## Analysis of Variance
+
+
+```{r, eval = FALSE}
+# # This is an extra code chunk to explore what happens if we drop Ecological Signficant
+# canopy_dens_orig <- canopy_dens
+# 
+# canopy_dens <- filter(canopy_dens, EcoCondition != "Ecologically Significant")
+# canopy_dens$EcoCondition <- droplevels(canopy_dens$EcoCondition)
+# 
+# # Make Site and Location factors as well
+# canopy_dens$Site <- as.factor(canopy_dens$Site)
+# canopy_dens$Location <- as.factor(canopy_dens$Location)
+
+```
+
+
+* Perform an ANOVA to check for differences in Canopy Density at Sites, Locations, and EcoConditions
+
+```{r}
+canopy_dens_lm_all <- lm(data = canopy_dens, Canopy_Density ~ Site * Location * EcoCondition )
+kable(anova(canopy_dens_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Canopy Density")
+```
+
+```{r}
+TukeyHSD(aov(data = canopy_dens, Canopy_Density ~ Site * Location * EcoCondition ))
+# library(multcomp)
+# Tukey1 <- glht(canopy_dens_lm_all, linfct = mcp(Site = "Tukey"))
+# cld(Tukey1)
+# 
+# cld(glht(canopy_dens_lm_all, linfct = mcp(Site = "Tukey")))
+# cld(glht(canopy_dens_lm_all, linfct = mcp(Location = "Tukey")))
+# cld(glht(canopy_dens_lm_all, linfct = mcp(EcoCondition = "Tukey")))
+
+# CLDDailyANOVA <- cld(Tukey.HSD.Results1, 
+#     alpha=0.05,
+#     Letters=letters,
+#     adjust="tukey",
+#     silent = TRUE)
+# CLDDailyANOVA
+# 
+# opar <- par(mai=c(1,1,2,1))
+# plot(CLDDailyANOVA, ann=F)
+# title("Tukey HSD Daily Log Glass Eels - Year", line = +9) 
+# title(xlab="Year", ylab="Log Glass Eels")
+
+```
+
+
+
+```{r}
+canopy_dens_aov_all <- aov(data = canopy_dens, Canopy_Density ~ Site * Location * EcoCondition )
+TukeyHSD(canopy_dens_aov_all)
+```
+
+
+* Perform an ANOVA to check for differences in Canopy Density at Sites and Locations
+
+```{r}
+canopy_dens_lm <- lm(data = canopy_dens, Canopy_Density ~ Site * Location)
+anova(canopy_dens_lm)
+
+canopy_dens_lm_noint <- lm(data = canopy_dens, Canopy_Density ~ Site + Location )
+anova(canopy_dens_lm_noint)
+```
+
+* Perform an ANOVA to check for differences in Canopy Density at Sites and EcoCondition
+
+```{r}
+canopy_dens_eco <- lm(data = canopy_dens, Canopy_Density ~ Site * EcoCondition)
+anova(canopy_dens_eco)
+```
+
+* Perform an ANOVA to check for differences in Canopy Density at Locations and EcoCondition
+
+```{r}
+canopy_dens_loc_eco <- lm(data = canopy_dens, Canopy_Density ~ Location * EcoCondition)
+anova(canopy_dens_loc_eco)
+```
+
+The interaction between location and ecocondition for canopy density is significantly different while the other comparisons for canopy density are statistically similar
+
+```{r}
+ggplot(data = canopy_dens, aes(x = Site, y = Canopy_Density_Adj_Trail)) +
+  geom_boxplot() +
+  ylab("Canopy Density on Trail") + 
+  theme_bw(base_family = "Times")
+  
+```
+
+
+* Perform a t-test to check for differences in Canopy Density at Adjacent Trails
+
+```{r}
+with(canopy_dens, t.test(Canopy_Density_Adj_Trail ~ Site))
+```
+
+There is a statistically significant difference in Canopy Density between the two parks with Rockefeller having a lower canopy density on adjacent trails
+
+# Diameter at Breast Height Analysis
+
+* Read in Tree data
+
+```{r}
+papp_trees <- read_xlsx(path = "../data/PappFieldData.xlsx", sheet = 1)
+# Filter out the dead trees
+papp_trees <- papp_trees %>% 
+  filter(!grepl(pattern = "dead", papp_trees$Species))
+# Add invasive/native status
+papp_trees <- left_join(papp_trees, papp_species, by = "Species")
+
+# Change order of ecological conditions
+papp_trees$EcoCondition <- factor(papp_trees$EcoCondition, 
+                                   levels = c("Disturbed", "Undisturbed", "Ecologically Significant"))
+
+```
+
+## Visualizing the Data
+
+* Plot values using a boxplot Plot DBH 
+
+```{r}
+ggplot(data = papp_trees, aes(x = Site, y = DBH, fill = Location)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot Plot DBH based on Eco Conditions
+
+```{r}
+ggplot(data = papp_trees, aes(x = Site, y = DBH, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot DBH based on Location and EcoCondition
+
+```{r}
+ggplot(data = papp_trees, aes(x = Location, y = DBH, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot DBH based on location
+
+```{r}
+ggplot(data = papp_trees, aes(x = Location, y = DBH)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot DBH based on site
+
+```{r}
+ggplot(data = papp_trees, aes(x = Site, y = DBH)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot DBH based on Site and Location
+
+```{r}
+ggplot(data = papp_trees, aes(x = Site, y = DBH)) +
+  geom_boxplot()
+```
+
+
+### Plot DBH using facets to split by site and color to separate by ecocondition
+
+```{r}
+ggplot(data = papp_trees, aes(x = Location, y = DBH, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~.) +
+  ylab("Diameter at Breast Height (DBH)") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+ggsave("../manuscript/figures/Figure-DBH-Loc-Site.png", device = "png", width = 6.5, height = 4, units = "in")
+```
+
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in DBH at Sites, Locations, and EcoConditions
+
+```{r}
+#DBH_lm_all <- lm(data = filter(papp_trees, EcoCondition != "Ecologically Significant"), DBH ~ Site * Location * EcoCondition )
+DBH_lm_all <- lm(data = papp_trees, DBH ~ Site * Location * EcoCondition )
+kable(anova(DBH_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of DBH")
+```
+
+
+* Perform an ANOVA to check for differences in DBH at Sites and Locations
+
+```{r}
+DBH_lm <- lm(data = papp_trees, DBH ~ Site * Location)
+kable(anova(DBH_lm), digits = 3, format = "pandoc", caption = "ANOVA table")
+
+DBH_lm_noint <- lm(data = papp_trees, DBH ~ Site + Location )
+kable(anova(DBH_lm_noint), digits = 3, format = "pandoc", caption = "ANOVA table")
+```
+
+* Perform an ANOVA to check for differences in DBH at Sites and EcoCondition
+
+```{r}
+DBH_lm_eco <- lm(data = papp_trees, DBH ~ Site * EcoCondition)
+anova(DBH_lm_eco)
+```
+
+Both above tests show a significant difference in DBH at Sites with Rockefeller having a slightly larger average DBH
+
+* Perform an ANOVA to check for differences in DBH at Locations and EcoCondition
+
+```{r}
+DBH_lm_loc_eco <- lm(data = papp_trees, DBH ~ Location * EcoCondition)
+anova(DBH_lm_loc_eco)
+```
+
+## T-test
+
+* Perform a t-test to check for differences in DBH based on Location
+
+```{r}
+with(papp_trees, t.test(DBH ~ Site))
+```
+
+# Analysis of Tree Quantity
+
+* Look at the number of trees above DBH 9cm at each plot
+
+```{r}
+trees_tally <- 
+  papp_trees %>%
+  group_by(Site, Plot_Num, Location, EcoCondition) %>%
+  tally()
+```
+
+## Visualize the Data
+
+* Plot values using a boxplot for tree number based on Site with Location and EcoCondition
+
+```{r}
+ggplot(data = trees_tally, aes(x = Site, y = n, fill = Location)) +
+  geom_boxplot()
+
+ggplot(data = trees_tally, aes(x = Site, y = n, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for tree number based on Location with EcoCondition
+
+```{r}
+ggplot(data = trees_tally, aes(x = Location, y = n, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for tree number based on Location
+
+```{r}
+ggplot(data = trees_tally, aes(x = Location, y = n)) +
+  geom_boxplot()
+```
+
+
+
+### Plot tree counts versus site, location, and ecocondition
+
+```{r}
+ggplot(data = trees_tally, aes(x = Location, y = n, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~.) +
+  ylab("Number of Trees") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+
+```
+
+
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Tree Number at Sites, Locations, and EcoConditions
+
+```{r}
+tree_tally_lm_all <- lm(data = trees_tally, n ~ Site * Location * EcoCondition )
+kable(anova(tree_tally_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Tree Counts")
+```
+
+
+* Perform an ANOVA to check for differences in tree number at Sites and Location
+
+```{r}
+tree_tally_lm <- lm(data = trees_tally, n ~ Site * Location)
+anova(tree_tally_lm)
+
+tree_tally_lm_noint <- lm(data = trees_tally, n ~ Site + Location )
+anova(tree_tally_lm_noint)
+```
+
+* Perform an ANOVA check for differences in tree number at Sites and EcoCondition
+
+```{r}
+tree_tally_lm_eco <- lm(data = trees_tally, n ~ Site * EcoCondition)
+anova(tree_tally_lm_eco)
+```
+
+* Perform an ANOVA to check for differences in tree number at Locations and EcoCondition
+
+```{r}
+tree_tally_lm_loc_eco <- lm(data = trees_tally, n ~ Site * Location * EcoCondition)
+anova(tree_tally_lm_loc_eco)
+```
+
+## T-test
+
+* Perform a t-test to check for differences in tree number at Locations
+
+```{r}
+with(trees_tally, t.test(n ~ Location))
+```
+
+There were no statistical differences in tree quantity across the data
+
+
+
+
+# Analysis of Tree Richness
+
+* Look at the number of **different species of trees** above DBH 9cm at each plot
+
+```{r}
+trees_richness <- 
+  papp_trees %>%
+  group_by(Site, Plot_Num, Location, EcoCondition) %>%
+  summarise(Richness = length(unique(Species)))
+```
+
+## Visualize the Data
+
+```{r}
+ggplot(data = trees_richness, aes(x = Location, y = Richness, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~.) +
+  ylab("Tree Species Richness") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+
+```
+
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Tree Richness at Sites, Locations, and EcoConditions
+
+```{r}
+tree_richness_lm_all <- lm(data = trees_richness, Richness ~ Site * Location * EcoCondition )
+kable(anova(tree_richness_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Tree Richness")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Analysis of Plant Species Richness based on Ground Cover data
+
+In plots with a radius of 5 m, all plants were identified to species and an estiamte of the percent cover of the plot for each species was made. 
+Each row of the data.frame represents a different species within a plot. 
+Because of this, the number of rows for each plot, excluding the row recording bare soil, represnts the species richness of that plot.
+
+* Load vegan
+
+```{r}
+library(vegan)
+```
+
+* Remove bare ground from ground cover data
+
+```{r}
+ground_veg <- papp_ground[ !(papp_ground$Species %in% c("Bare ground")), ]
+```
+
+* Look at number of plant species in each plot
+
+```{r}
+plants_tally <- 
+  ground_veg %>%
+  group_by(Site, Plot_Num, Location, EcoCondition) %>%
+  tally()
+```
+
+## Visualizing the Data
+
+* Plot values using a boxplot for plant richness based on Site with Location and EcoCondition
+
+```{r}
+ggplot(data = plants_tally, aes(x = Site, y = n, fill = Location)) +
+  geom_boxplot()
+
+ggplot(data = plants_tally, aes(x = Site, y = n, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for plant richness based on Location with EcoCondition
+
+```{r}
+ggplot(data = plants_tally, aes(x = Location, y = n, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for plant richness based on Location
+
+```{r}
+ggplot(data = plants_tally, aes(x = Location, y = n)) +
+  geom_boxplot()
+```
+
+
+### Plot plant richness based on location, site, and ecocondition
+
+```{r}
+ggplot(data = plants_tally, aes(x = Location, y = n, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~.) +
+  ylab("Plant Species Richness") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+
+```
+
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Total Plant Richness at Sites, Locations, and EcoConditions
+
+```{r}
+plant_tally_lm_all <- lm(data = plants_tally, n ~ Site * Location * EcoCondition )
+kable(anova(plant_tally_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Total Plant Counts")
+```
+
+```{r}
+TukeyHSD(aov(data = plants_tally, n ~ Site * Location * EcoCondition))
+```
+
+
+
+ *Perform an ANOVA to check for differences in plant richness at Sites and Location
+
+```{r}
+plant_tally_lm <- lm(data = plants_tally, n ~ Site * Location)
+anova(plant_tally_lm)
+
+plant_tally_lm_noint <- lm(data = plants_tally, n ~ Site + Location )
+anova(plant_tally_lm_noint)
+```
+
+* Perform an ANOVA to check for differences in plant richness at Sites and EcoCondition
+
+```{r}
+plant_tally_lm_eco <- lm(data = plants_tally, n ~ Site * EcoCondition)
+anova(plant_tally_lm_eco)
+```
+
+* Perform an ANOVA to check for differences in plant richness at Locations and EcoCondition
+
+```{r}
+plant_tally_lm_loc_eco <- lm(data = plants_tally, n ~ Location * EcoCondition)
+anova(plant_tally_lm_loc_eco)
+```
+
+## T-test
+
+* Perform a t-test to check for differences in plant richness at Locations
+
+```{r}
+with(plants_tally, t.test(n ~ Location))
+```
+
+There were no statistical differences in tree quantity across the data
+
+
+
+
+
+# Analysis of Native Plant Quantity
+
+* Look at number of native plants at each plot
+
+```{r}
+nat_inv_plants_tally <- 
+  ground_veg %>%
+  group_by(Site, Plot_Num, Location, EcoCondition, Inv_Nat) %>%
+  tally()
+
+# change flags for native and invasive
+nat_inv_plants_tally$Inv_Nat <- 
+  ifelse(nat_inv_plants_tally$Inv_Nat == "n", yes = "Native", no = "Invasive")
+nat_inv_plants_tally$Inv_Nat <- factor(nat_inv_plants_tally$Inv_Nat,
+                                       levels = c("Native", "Invasive"))
+
+#Separate the Native Data
+native_plants_tally <- nat_inv_plants_tally %>%
+  filter(Inv_Nat == "Native")
+```
+
+## Visualize the Data
+
+### Use facet grid to plot species richness by site, location, ecocondition, and native/inv
+
+```{r}
+ggplot(data = nat_inv_plants_tally, aes(x = Location, y = n, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~Inv_Nat) +
+  ylab("Plant Species Richness") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+
+```
+
+
+
+
+* Plot values using a boxplot for native plant number based on Site with Location and EcoCondition
+
+```{r}
+ggplot(data = native_plants_tally, aes(x = Site, y = n, fill = Location)) +
+  geom_boxplot()
+
+ggplot(data = native_plants_tally, aes(x = Site, y = n, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for native plant number based on Location with EcoCondition
+
+```{r}
+ggplot(data = native_plants_tally, aes(x = Location, y = n, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for native plant number based on Location
+
+```{r}
+ggplot(data = native_plants_tally, aes(x = Location, y = n)) +
+  geom_boxplot()
+```
+
+## Analysis of Variance
+
+```{r}
+nat_inv_plant_tally_lm_all <- lm(data = nat_inv_plants_tally, n ~ Site * Location * EcoCondition * Inv_Nat )
+kable(anova(nat_inv_plant_tally_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Plant Species Richness")
+```
+
+
+
+* Perform an ANOVA to check for differences in Native Plant Richness at Sites, Locations, and EcoConditions
+
+```{r}
+native_plant_tally_lm_all <- lm(data = native_plants_tally, n ~ Site * Location * EcoCondition )
+kable(anova(native_plant_tally_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Native Plant Species Richness")
+```
+
+ *Perform an ANOVA to check for differences in native plant number at Sites and Location
+
+```{r}
+native_plant_tally_lm <- lm(data = native_plants_tally, n ~ Site * Location)
+anova(native_plant_tally_lm)
+
+native_plant_tally_lm_noint <- lm(data = native_plants_tally, n ~ Site + Location )
+anova(native_plant_tally_lm_noint)
+```
+
+* Perform an ANOVA to check for differences in native plant number at Sites and EcoCondition
+
+```{r}
+native_plant_tally_lm_eco <- lm(data = native_plants_tally, n ~ Site * EcoCondition)
+anova(native_plant_tally_lm_eco)
+```
+
+There is a statistical difference in native plant tally for the interaction of Site and EcoCondition
+
+* Perform an ANOVA to check for differences in native plant number at Locations and EcoCondition
+
+```{r}
+native_plant_tally_lm_loc_eco <- lm(data = native_plants_tally, n ~ Location * EcoCondition)
+anova(native_plant_tally_lm_loc_eco)
+```
+
+## T-test
+
+* Perform a t-test to check for differences in native plant number at Locations
+
+```{r}
+with(native_plants_tally, t.test(n ~ Location))
+```
+
+
+
+
+# Analysis of Total Coverage
+
+## Visualize the Data
+
+* Look at plant data based on Percent Cover
+
+```{r}
+ground_veg2 <- ground_veg[, !(colnames(ground_veg) %in% c("Braun_Blaunquet"))]
+
+# Calculate relative percent cover first
+ground_veg2 <-
+  ground_veg2 %>% 
+  group_by(Plot_Num) %>%
+  mutate(Plot_Tot_Cover = sum(Percent_Cover))
+ground_veg2$Relative_Percent_Cover <-
+  ground_veg2$Percent_Cover / ground_veg2$Plot_Tot_Cover
+
+# Group the Data 
+papp_ground_cover <- ground_veg2 %>%
+  group_by(Site, Location, EcoCondition, Plot_Num)
+
+# change flags for native and invasive
+papp_ground_cover$Inv_Nat <- 
+  ifelse(papp_ground_cover$Inv_Nat == "n", yes = "Native", no = "Invasive")
+papp_ground_cover$Inv_Nat <- factor(papp_ground_cover$Inv_Nat,
+                                       levels = c("Native", "Invasive"))
+
+# Summarize the data by plots
+papp_ground_cover_summary <- 
+  papp_ground_cover %>%
+  group_by(Site, Location, EcoCondition, Plot_Num, Inv_Nat) %>%
+  summarise(Tot_Perc_Cover = sum(Percent_Cover),
+            Tot_Rel_Perc_Cover = sum(Relative_Percent_Cover))
+
+```
+
+
+**Dont use this one**
+
+```{r}
+ggplot(data = papp_ground_cover, aes(x = Location, y = Relative_Percent_Cover, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~Inv_Nat) +
+  ylab("Relative Percent Cover") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+
+```
+
+
+```{r}
+ggplot(data = papp_ground_cover, aes(x = Location, y = Percent_Cover, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~Inv_Nat) +
+  ylab("Percent Cover") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+
+```
+
+### Relative Total Percent Cover by Site, Location, EcoCondition, and Invasive/Native
+
+
+```{r}
+ggplot(data = papp_ground_cover_summary, aes(x = Location, y = Tot_Rel_Perc_Cover, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~Inv_Nat) +
+  ylab("Total Relative Percent Cover") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+
+```
+
+
+### Corresponding ANOVA to Total Relative Percent Cover by Site, Location, EcoCondition, and Invasive/Native
+
+```{r}
+inv_nat_tot_rel_cover_lm_all <- lm(data = papp_ground_cover_summary, Tot_Rel_Perc_Cover ~ Site * Location * EcoCondition * Inv_Nat )
+kable(anova(inv_nat_tot_rel_cover_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Total Relative Percent Cover")
+summary(inv_nat_tot_rel_cover_lm_all)
+```
+
+
+
+### Total Percent Cover by Site, Location, EcoCondition, and Invasive/Native
+
+
+```{r}
+ggplot(data = papp_ground_cover_summary, aes(x = Location, y = Tot_Perc_Cover, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site~Inv_Nat) +
+  ylab("Total Percent Cover") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+
+```
+
+### Corresponding ANOVA to Total Percent Cover by Site, Location, EcoCondition, and Invasive/Native
+
+```{r}
+inv_nat_tot_cover_lm_all <- lm(data = papp_ground_cover_summary, Tot_Perc_Cover ~ Site * Location * EcoCondition * Inv_Nat )
+kable(anova(inv_nat_tot_cover_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Total Percent Cover")
+```
+
+
+
+* Plot values using a boxplot for Total Coverage based on Site with Location and EcoCondition
+
+```{r}
+ggplot(data = papp_ground_cover, aes(x = Site, y = Plot_Tot_Cover, fill = Location)) +
+  geom_boxplot()
+
+ggplot(data = papp_ground_cover, aes(x = Site, y = Plot_Tot_Cover, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for Total Coverage based on Location with EcoCondition
+
+```{r}
+ggplot(data = papp_ground_cover, aes(x = Location, y = Plot_Tot_Cover, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for Total Coverage based on EcoCondition
+
+```{r}
+ggplot(data = papp_ground_cover, aes(x = EcoCondition, y = Plot_Tot_Cover)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for Total Coverage based on Location
+
+```{r}
+ggplot(data = papp_ground_cover, aes(x = Site, y = Plot_Tot_Cover, fill = Location)) +
+  geom_boxplot()
+```
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Total Coverage at Sites, Locations, and EcoConditions
+
+```{r}
+cov_lm_all <- lm(data = papp_ground_cover, Plot_Tot_Cover ~ Site * Location * EcoCondition )
+kable(anova(cov_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Total Coverage")
+```
+
+* Perform an ANOVA to check for differences in Total Coverage at Sites and Location
+
+```{r}
+cov_lm <- lm(data = papp_ground_cover, Plot_Tot_Cover ~ Site * Location)
+anova(cov_lm)
+
+cov_lm_noint <- lm(data = papp_ground_cover, Plot_Tot_Cover ~ Site + Location )
+anova(cov_lm_noint)
+```
+
+* Perform an ANOVA to check for differences in Total Coverage at Sites and EcoCondition
+
+```{r}
+cov_lm_eco <- lm(data = papp_ground_cover, Plot_Tot_Cover ~ Site * EcoCondition)
+anova(cov_lm_eco)
+```
+
+## T-test
+
+* Perform a t-test to check for differences in Total Coverage at Locations
+
+```{r}
+with(papp_ground_cover, t.test(Plot_Tot_Cover ~ Location))
+```
+
+There are statistical differences in all of the comparisons showing that Rockefeller has greater total coverage, edge site have greater total coverage, and at RSPP total coverage is greatest in undisturbed sites and least at disturbed sites while Teatown shows the opposite 
+
+
+
+
+
+
+
+# Analysis of Relative Native Plant Coverage
+
+* Group the data by Plot Number, Location, EcoCondition, and Invasiveness/Nativeness. Filter Data based on nativeness
+
+```{r}
+papp_ground_summary <- ground_veg2 %>%
+  group_by(Plot_Num, Site, Location, EcoCondition, Inv_Nat) %>%
+  summarise(Inv_Nat_Rel_Cover = sum(Relative_Percent_Cover))
+
+papp_ground_summary_nat <- papp_ground_summary %>%
+  filter(Inv_Nat == "n")
+```
+
+## Visualize the Data
+
+* Plot values using a boxplot for Relative Native Plant Coverage based on Site with Location and EcoCondition
+
+```{r}
+ggplot(data = papp_ground_summary_nat, aes(x = Site, y = Inv_Nat_Rel_Cover, fill = Location)) +
+  geom_boxplot()
+
+ggplot(data = papp_ground_summary_nat, aes(x = Site, y = Inv_Nat_Rel_Cover, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for Relative Native Plant Coverage based on Location with EcoCondition
+
+```{r}
+ggplot(data = papp_ground_summary_nat, aes(x = Location, y = Inv_Nat_Rel_Cover, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for Relative Native Plant Coverage based on Site
+
+```{r}
+ggplot(data = papp_ground_summary_nat, aes(x = Site, y = Inv_Nat_Rel_Cover)) +
+  geom_boxplot()
+```
+
+```{r}
+ggplot(data = papp_ground_summary_nat, aes(x = EcoCondition, y = Inv_Nat_Rel_Cover)) +
+  geom_boxplot()
+```
+
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Relative Native Coverage at Sites, Locations, and EcoConditions
+
+```{r}
+native_coverage_lm_all <- lm(data = papp_ground_summary_nat, Inv_Nat_Rel_Cover ~ Site * Location * EcoCondition )
+kable(anova(native_coverage_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Relative Native Coverage")
+```
+
+* Perform an ANOVA to check for differences in Relative Native Plant Coverage at Sites and Location
+
+```{r}
+native_coverage_lm <- lm(data = papp_ground_summary_nat, Inv_Nat_Rel_Cover ~ Site * Location)
+anova(native_coverage_lm)
+
+native_coverage_lm_noint <- lm(data = papp_ground_summary_nat, Inv_Nat_Rel_Cover ~ Site + Location )
+anova(native_coverage_lm_noint)
+```
+
+* Perform an ANOVA to check for differences in Relative Native Plant Coverage at Sites and EcoCondition
+
+```{r}
+native_coverage_lm_eco <- lm(data = papp_ground_summary_nat, Inv_Nat_Rel_Cover ~ Site * EcoCondition)
+anova(native_coverage_lm_eco)
+```
+
+These results show that Teatown has a far great relative native coverage
+
+## T-test
+
+* Perform a t-test to check for differences in Relative Native Plant Coverage at Locations
+
+```{r}
+with(papp_ground_summary_nat, t.test(Inv_Nat_Rel_Cover ~ Location))
+```
+
+
+# Analysis of Relative Invasive Plant Coverage
+
+## Visualize the Data
+
+* Group the data by Plot Number, Location, EcoCondition, and Invasiveness/Nativeness. Filter Data based on invasiveness
+```{r}
+papp_ground_summary <- ground_veg2 %>%
+  group_by(Plot_Num, Site, Location, EcoCondition, Inv_Nat) %>%
+  summarise(Inv_Nat_Rel_Cover = sum(Relative_Percent_Cover))
+
+papp_ground_summary_inv <- papp_ground_summary %>%
+  filter(Inv_Nat == "i ")
+```
+
+* Plot values using a boxplot for Relative Invasive Plant Coverage based on Site with Location and EcoCondition
+
+```{r}
+ggplot(data = papp_ground_summary_inv, aes(x = Site, y = Inv_Nat_Rel_Cover, fill = Location)) +
+  geom_boxplot()
+
+ggplot(data = papp_ground_summary_inv, aes(x = Site, y = Inv_Nat_Rel_Cover, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for Relative Invasive Plant Coverage based on Location with EcoCondition
+
+```{r}
+ggplot(data = papp_ground_summary_inv, aes(x = Location, y = Inv_Nat_Rel_Cover, fill = EcoCondition)) +
+  geom_boxplot()
+```
+
+* Plot values using a boxplot for Relative Invasive Plant Coverage based on Site
+
+```{r}
+ggplot(data = papp_ground_summary_inv, aes(x = Site, y = Inv_Nat_Rel_Cover)) +
+  geom_boxplot()
+```
+
+```{r}
+ggplot(data = papp_ground_summary_inv, aes(x = EcoCondition, y = Inv_Nat_Rel_Cover)) +
+  geom_boxplot()
+```
+
+```{r}
+ggplot(data = papp_ground_summary_inv, aes(x = Location, y = Inv_Nat_Rel_Cover)) +
+  geom_boxplot()
+```
+
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Relative Invasive Coverage at Sites, Locations, and EcoConditions
+
+```{r}
+relative_invasiveness_lm_all <- lm(data = papp_ground_summary_inv, Inv_Nat_Rel_Cover ~ Site * Location * EcoCondition )
+kable(anova(relative_invasiveness_lm_all), digits = 3, format = "pandoc", caption = "ANOVA table of Relative Invasive Coverage")
+```
+
+* Perform an ANOVA to check for differences in Relative Invasive Plant Coverage at Sites and Location
+
+```{r}
+relative_invasiveness_lm <- lm(data = papp_ground_summary_inv, Inv_Nat_Rel_Cover ~ Site * Location)
+anova(relative_invasiveness_lm)
+
+relative_invasiveness_lm_noint <- lm(data = papp_ground_summary_inv, Inv_Nat_Rel_Cover ~ Site + Location )
+anova(relative_invasiveness_lm_noint)
+```
+
+* Perform an ANOVA to check for differences in Relative Invasive Plant Coverage at Sites and EcoCondition
+
+```{r}
+relative_invasiveness_lm_eco <- lm(data = papp_ground_summary_inv, Inv_Nat_Rel_Cover ~ Site * EcoCondition)
+anova(relative_invasiveness_lm_eco)
+```
+
+## T-test
+
+* Perform a t-test to check for differences in Relative Invasive Plant Coverage at Locations
+
+```{r}
+with(papp_ground_summary_inv, t.test(Inv_Nat_Rel_Cover ~ Location))
+```
+
+* Perform a t-test to check for differences in Relative Invasive Plant Coverage at Sites
+
+```{r}
+with(papp_ground_summary_inv, t.test(Inv_Nat_Rel_Cover ~ Site))
+```
+
+
+
+
+# Shannon Index of Dissimilarity for Tree Data
+
+* Load Packages
+
+```{r}
+library(tidyr)
+library(dplyr)
+library(vegan)
+```
+
+## Data Wrangling
+
+* Look at the number of trees above DBH 9cm at each plot
+
+```{r}
+tree_species_tally <- 
+  papp_trees %>%
+  group_by(Species, Site, Plot_Num, Location, EcoCondition) %>%
+  tally()
+```
+
+* Use 'Spread' function to match the model set by BCI data
+
+```{r}
+tree_spread <- tree_species_tally %>%
+  spread(Species, n, convert = TRUE)
+```
+
+* Remove Unnecessary Variables, Set 'N/A' values to Zero, Set Row Names to Plot Number
+
+```{r}
+trees_BCI <- tree_spread[, !(colnames(tree_spread) %in% c("Site", "Location", "EcoCondition"))] ;
+  trees_BCI[is.na(trees_BCI <- trees_BCI)] <- 0 ;
+   
+trees_BCI <- data.frame(trees_BCI, row.names = 1)
+```
+
+## Shannon Index
+
+* Use 'diversity' function to find the Shannon Values for each plot and calculate the mean
+
+```{r}
+shannon_trees <- diversity(trees_BCI)
+canopy_dens$shannon_trees <- shannon_trees
+mean(shannon_trees)
+```
+
+## Visualize the Data
+
+* Plot values using a boxplot for Shannon Index
+
+```{r}
+ggplot(data = canopy_dens, aes(x = Location, y = shannon_trees, fill = EcoCondition)) +
+  geom_boxplot() +
+  facet_grid(Site ~ .)
+```
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Shannon Index of Trees at Sites, Locations, and EcoConditions
+
+```{r}
+canopy_dens_sh_all <- lm(data = canopy_dens, shannon_trees ~ Site * Location * EcoCondition )
+kable(anova(canopy_dens_sh_all), digits = 3, format = "pandoc", caption = "ANOVA table of Shannon Index of Trees")
+```
+
+* Perform an ANOVA to check for differences in Shannon Index at Sites and Locations
+
+```{r}
+canopy_dens_sh <- lm(data = canopy_dens, shannon_trees ~ Site * Location)
+anova(canopy_dens_sh)
+
+canopy_dens_sh_noint <- lm(data = canopy_dens, shannon_trees ~ Site + Location)
+anova(canopy_dens_sh_noint)
+```
+
+* Perform an ANOVA to check for differences in Shannon Index at Sites and EcoCondition
+
+```{r}
+canopy_dens_sh_eco <- lm(data = canopy_dens, shannon_trees ~ Site * EcoCondition)
+anova(canopy_dens_sh_eco)
+```
+
+* Perform an ANOVA to check for differences in Shannon Index at Locations and EcoCondition
+
+```{r}
+canopy_dens_sh_loc_eco <- lm(data = canopy_dens, shannon_trees ~ Location * EcoCondition)
+anova(canopy_dens_sh_loc_eco)
+```
+
+## T-test
+
+* Perform a t-test to check for differences in Shannon Index at Locations
+
+```{r}
+with(canopy_dens, t.test(shannon_trees ~ Location))
+```
+
+# Shannon Index of Dissimilarity for Plant Data
+
+## Data Wrangling
+
+* Use 'Spread' function to match the model set by BCI data
+
+```{r}
+ground_spread <- ground_veg2 %>%
+  select(Species, Relative_Percent_Cover, Plot_Num) %>%
+  spread(Species, Relative_Percent_Cover, convert = TRUE)
+```
+
+* Remove Unnecessary Variables, Set 'N/A' values to Zero, Set Row Names to Plot Number Vaues
+
+```{r}
+ground_BCI <- ground_spread
+ground_BCI[is.na(ground_BCI <- ground_BCI)] <- 0 
+ground_BCI <- data.frame(ground_BCI, row.names = 1)
+```
+
+## Shannon Index
+
+* Use 'diversity' function to find the Shannon Values for each plot and calculate the mean
+
+```{r}
+shannon_ground <- diversity(ground_BCI)
+plants_tally$shannon_ground <- shannon_ground
+mean(shannon_ground)
+```
+
+## Visualize the Data
+
+* Plot values using a boxplot for Shannon Index
+
+```{r}
+ggplot(data = plants_tally, aes(x = Site, y = shannon_ground, fill = EcoCondition)) +
+  geom_boxplot() 
+
+```
+
+```{r}
+ggplot(data = plants_tally, aes(x = Site, y = shannon_ground, fill = Location)) +
+  geom_boxplot() 
+ 
+```
+
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Shannon Index of Plants at Sites, Locations, and EcoConditions
+
+```{r}
+papp_ground_sh_all <- lm(data = plants_tally, shannon_ground ~ Site * Location * EcoCondition )
+kable(anova(papp_ground_sh_all), digits = 3, format = "pandoc", caption = "ANOVA table of Shannon Index of Plants")
+```
+
+* Perform an ANOVA to check for differences in Shannon Index at Sites and Locations
+
+```{r}
+papp_ground_sh <- lm(data = plants_tally, shannon_ground ~ Site * Location)
+anova(papp_ground_sh)
+
+papp_ground_sh_noint <- lm(data = plants_tally, shannon_ground ~ Site + Location )
+anova(papp_ground_sh_noint)
+```
+
+* Perform an ANOVA to check for differences in Shannon Index at Sites and EcoCondition
+
+```{r}
+papp_ground_sh_eco <- lm(data = plants_tally, shannon_ground ~ Site * EcoCondition)
+anova(papp_ground_sh_eco)
+```
+
+* Perform an ANOVA to check for differences in Shannon Index at Locations and EcoCondition
+
+```{r}
+papp_ground_sh_loc_eco <- lm(data = plants_tally, shannon_ground ~ Location * EcoCondition)
+anova(papp_ground_sh_loc_eco)
+```
+
+A higher Shannon index (closer to 1) indicates a lower diversity, therefore the data shows that disturbed sites have significantly less diversity while undistubed sites have significantly greater diversity
+
+## T-test
+
+* Perform a t-test to check for differences in Shannon Index at Locations
+
+```{r}
+with(plants_tally, t.test(shannon_ground ~ Location))
+```
+
+* Perform a t-test to check for differences in Shannon Index at Locations for Disturbed Sites 
+
+```{r}
+disturbed <- plants_tally %>%
+  filter(EcoCondition == "Disturbed") 
+
+with(disturbed, t.test(shannon_ground ~ Location))
+```
+
+* Perform a t-test to check for differences in Shannon Index at Locations for Undisturbed and Ecologically Significant Sites
+
+```{r}
+Undisturbed <- plants_tally %>%
+  filter(EcoCondition == "Undisturbed")
+
+with(Undisturbed, t.test(shannon_ground ~ Location))
+```
+
+
+* Perform a t-test to check for differences in Shannon Index at Locations for Ecologically Significant Sites
+
+
+```{r}
+ecosig <- plants_tally %>%
+  filter(EcoCondition == "Ecologically Significant")
+
+with(ecosig, t.test(shannon_ground ~ Location))
+```
+
+# Shannon Index of Dissimilarity for Native Plant Data
+
+## Data Wrangling
+
+* Use 'Spread' function to match the model set by BCI data
+
+```{r}
+native_ground_spread <- ground_veg2 %>%
+  filter(Inv_Nat == "n") %>%
+  select(Species, Relative_Percent_Cover, Plot_Num) %>%
+  spread(Species, Relative_Percent_Cover, convert = TRUE)
+```
+
+* Remove Unnecessary Variables, Set 'N/A' values to Zero, Set Row Names to Plot Number Vaues
+
+```{r}
+native_ground_BCI <- native_ground_spread
+native_ground_BCI[is.na(native_ground_BCI <- native_ground_BCI)] <- 0 
+native_ground_BCI <- data.frame(native_ground_BCI, row.names = 1)
+```
+
+## Shannon Index
+
+* Use 'diversity' function to find the Shannon Values for each plot and calculate the mean
+
+```{r}
+native_shannon_ground <- diversity(native_ground_BCI)
+plants_tally$native_shannon_ground <- native_shannon_ground
+mean(native_shannon_ground)
+```
+
+## Visualize the Data
+
+* Plot values using a boxplot for Shannon Index
+
+```{r}
+ggplot(data = plants_tally, aes(x = Site, y = native_shannon_ground, fill = EcoCondition)) +
+  geom_boxplot() 
+```
+
+```{r}
+ggplot(data = plants_tally, aes(x = EcoCondition, y = native_shannon_ground)) +
+  geom_boxplot()
+```
+
+```{r}
+ggplot(data = plants_tally, aes(x = Site, y = native_shannon_ground, fill = Location)) +
+  geom_boxplot() 
+```
+
+
+## Analysis of Variance
+
+* Perform an ANOVA to check for differences in Shannon Index of Native Plants at Sites, Locations, and EcoConditions
+
+```{r}
+native_ground_sh_all <- lm(data = plants_tally, native_shannon_ground ~ Site * Location * EcoCondition )
+kable(anova(native_ground_sh_all), digits = 3, format = "pandoc", caption = "ANOVA table of Shannon Index of Native Plants")
+```
+
+* Perform an ANOVA to check for differences in Shannon Index at Sites and Locations
+
+```{r}
+native_ground_sh <- lm(data = plants_tally, native_shannon_ground ~ Site * Location)
+anova(native_ground_sh)
+
+native_ground_sh_noint <- lm(data = plants_tally, native_shannon_ground ~ Site + Location )
+anova(native_ground_sh_noint)
+```
+
+* Perform an ANOVA to check for differences in Shannon Index at Sites and EcoCondition
+
+```{r}
+native_ground_sh_eco <- lm(data = plants_tally, native_shannon_ground ~ Site * EcoCondition)
+anova(native_ground_sh_eco)
+```
+
+* Perform an ANOVA to check for differences in Shannon Index at Locations and EcoCondition
+
+```{r}
+native_ground_sh_loc_eco <- lm(data = plants_tally, native_shannon_ground ~ Location * EcoCondition)
+anova(native_ground_sh_loc_eco)
+```
+
+A higher Shannon index (closer to 1) indicates a lower diversity, therefore the data shows that even with Invasive Plants removed, disturbed sites have significantly less diversity while undistubed sites have significantly greater diversity
+
+## T-test
+
+* Perform a t-test to check for differences in Shannon Index at Locations
+
+```{r}
+with(plants_tally, t.test(native_shannon_ground ~ Location))
+```
+
+* Perform a t-test to check for differences in Shannon Index at Locations for Disturbed Sites 
+
+```{r}
+nat_disturbed <- plants_tally %>%
+  filter(EcoCondition == "Disturbed") 
+
+with(nat_disturbed, t.test(native_shannon_ground ~ Location))
+```
+
+* Perform a t-test to check for differences in Shannon Index at Locations for Undisturbed Sites
+
+```{r}
+nat_undisturbed <- plants_tally %>%
+  filter(EcoCondition == "Undisturbed") 
+with(nat_undisturbed, t.test(native_shannon_ground ~ Location))
+```
+
+* Perform a t-test to check for differences in Shannon Index at Locations for Ecologically Significant Sites
+
+```{r}
+nat_ecosig <- plants_tally %>%
+  filter(EcoCondition == "Ecologically Significant")
+
+with(nat_ecosig, t.test(native_shannon_ground ~ Location))
+```
+
+# Ordination/Multidimensional Scaling of Tree Data
+
+## Multidimensional Scaling of Tree Data
+
+* Use vegan function 'metaMDS' and plot the values using 'ordiplot'
+
+```{r}
+Ord_Trees <- metaMDS(trees_BCI)
+
+Ord_Trees
+
+ordiplot(Ord_Trees, type = "t" )
+```
+
+* Use vegan function 'vegdist' and specify the Bray-Curtis Dissimilarity Index, create a cluster dendrogram to visualize the tree data
+
+```{r}
+Tree_dist <- vegdist(trees_BCI, method = "bray")
+
+Tree_clust <- hclust(Tree_dist)
+
+plot(Tree_clust)
+```
+
+```{r}
+Trees_rda <- rda(trees_BCI)
+
+plot(Trees_rda, scaling = 2)
+ordiplot(Trees_rda)
+```
+
+
+# Ordination/Multidimensional Scaling of Tree Data
+
+## Multidimensional Scaling of Plant Data
+
+* Use vegan function 'metaMDS' and plot the values using 'ordiplot'
+
+```{r}
+Ord_ground <- metaMDS(ground_BCI)
+
+Ord_ground
+
+ordiplot(Ord_ground, type = "t")
+```
+
+* Use vegan function 'vegdist' and specify the Bray-Curtis Dissimilarity Index, create a cluster dendrogram to visualize the ground data
+
+```{r}
+Ground_dist <- vegdist(ground_BCI, method = "bray")
+
+Ground_clust <- hclust(Ground_dist)
+
+plot(Ground_clust)
+```
+
+```{r}
+Ground_rda <- rda(ground_BCI)
+
+plot(Ground_rda, scaling = 2)
+ordiplot(Ground_rda)
+```
+
+# Ordination/Multidimensional Scaling of Native Plant Data
+
+## Multidimensional Scaling of Plant Data
+
+* Use vegan function 'metaMDS' and plot the values using 'ordiplot'
+
+```{r}
+Ord_native_ground <- metaMDS(native_ground_BCI)
+
+Ord_native_ground
+
+ordiplot(Ord_native_ground, type = "t")
+```
+
+* Use vegan function 'vegdist' and specify the Bray-Curtis Dissimilarity Index, create a cluster dendrogram to visualize the native ground data
+
+```{r}
+Native_Ground_dist <- vegdist(native_ground_BCI, method = "bray")
+
+Native_Ground_clust <- hclust(Native_Ground_dist)
+
+plot(Native_Ground_clust)
+```
+
+```{r}
+Native_Ground_rda <- rda(native_ground_BCI)
+
+plot(Native_Ground_rda, scaling = 2)
+ordiplot(Native_Ground_rda)
+```
+
+# Beta Diversity for Tree Data
+
+## Sorensen's Index
+
+* Use 'vegdist' function to find the Sorensen Values for each plot and calculate the mean
+
+```{r}
+beta <- vegdist(trees_BCI, binary=TRUE)#
+
+# Reshape the beta diversity matrix from wide to long format
+beta_mat <- as.matrix(beta)
+beta_mat[!lower.tri(beta_mat)] <- NA
+beta_df <- as.data.frame(beta_mat)
+beta_df$plot1 <- row.names(beta_df)
+beta_df_long <- gather(beta_df, "plot2", "beta", 1:60)
+beta_df_long <- filter(beta_df_long, !is.na(beta))
+
+# Merge beta_df_long with data.frame columns for plot characteristics
+beta_df_long <- inner_join(beta_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot1" = "Plot_Num"))
+beta_df_long <- inner_join(beta_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot2" = "Plot_Num"))
+
+```
+
+```{r}
+ggplot(data = filter(beta_df_long, Site.x == Site.y), aes(x = Site.x, y = beta)) +
+  geom_boxplot()
+```
+
+Use a simple t-test to see if there are significant differences in turnover among plots between sites
+
+```{r}
+beta_temp <- filter(beta_df_long, Site.x == Site.y)
+t.test(data = beta_temp, beta~Site.x)
+```
+
+Now let's look for differences also based on edge vs interior
+
+```{r}
+beta_temp <- filter(beta_df_long, Site.x == Site.y, Location.x == Location.y)
+ggplot(data = beta_temp, aes(x = Site.x, y = beta, fill = Location.x)) +
+  geom_boxplot()
+
+```
+
+Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
+
+```{r}
+kable(anova(lm(data = beta_temp, beta ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table")
+```
+
+Nope.
+
+Now let's check turn-over between edges and interiors
+
+```{r}
+beta_temp <- filter(beta_df_long, Site.x == Site.y, Location.x != Location.y)
+ggplot(data = beta_temp, aes(x = Site.x, y = beta)) +
+  geom_boxplot()
+
+t.test(data = beta_temp, beta~Site.x)
+
+```
+
+OK, so this suggests that the differences between edge and interior plots is greater at Rockefeller than at Teatown.
+
+This might actually be an indication of edge effects at Rockefeller
+
+
+Sites different, Location the same
+
+This may address the question of whether edges and off-trail locations are different between the two sites.
+
+```{r}
+beta_temp <- filter(beta_df_long, Site.x != Site.y, Location.x == Location.y)
+ggplot(data = beta_temp, aes(x = Location.x, y = beta)) +
+  geom_boxplot()
+
+t.test(data = beta_temp, beta~Location.x)
+
+```
+
+## Bray-Curtis
+
+* Use `vegdist` function to find Bray-Curtis dissimilarity values for ground vegetation
+
+```{r}
+beta_bray <- vegdist(trees_BCI, method = "bray")
+
+# Reshape the beta diversity matrix from wide to long format
+beta_bray_mat <- as.matrix(beta_bray)
+beta_bray_mat[!lower.tri(beta_bray_mat)] <- NA
+beta_bray_df <- as.data.frame(beta_bray_mat)
+beta_bray_df$plot1 <- row.names(beta_bray_df)
+beta_bray_df_long <- gather(beta_bray_df, "plot2", "beta_bray", 1:60)
+beta_bray_df_long <- filter(beta_bray_df_long, !is.na(beta_bray))
+
+# Merge beta_bray_df_long with data.frame columns for plot characteristics
+beta_bray_df_long <- inner_join(beta_bray_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot1" = "Plot_Num"))
+beta_bray_df_long <- inner_join(beta_bray_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot2" = "Plot_Num"))
+
+```
+
+```{r}
+ggplot(data = filter(beta_bray_df_long, Site.x == Site.y), aes(x = Site.x, y = beta_bray)) +
+  geom_boxplot()
+```
+
+Use a simple t-test to see if there are significant differences in turnover among plots between sites
+
+```{r}
+beta_bray_temp <- filter(beta_bray_df_long, Site.x == Site.y)
+t.test(data = beta_bray_temp, beta_bray~Site.x)
+```
+
+Now let's look for differences also based on edge vs interior
+
+```{r}
+beta_bray_temp <- filter(beta_bray_df_long, Site.x == Site.y, Location.x == Location.y)
+ggplot(data = beta_bray_temp, aes(x = Site.x, y = beta_bray, fill = Location.x)) +
+  geom_boxplot()
+
+```
+
+Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
+
+```{r}
+kable(anova(lm(data = beta_bray_temp, beta_bray ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table")
+```
+Nope
+
+Now let's check turn-over between edges and interiors
+
+```{r}
+beta_bray_temp <- filter(beta_bray_df_long, Site.x == Site.y, Location.x != Location.y)
+ggplot(data = beta_bray_temp, aes(x = Site.x, y = beta_bray)) +
+  geom_boxplot()
+
+t.test(data = beta_bray_temp, beta_bray~Site.x)
+
+```
+
+```{r}
+beta_temp <- filter(beta_df_long, Site.x != Site.y, Location.x == Location.y)
+ggplot(data = beta_temp, aes(x = Location.x, y = beta)) +
+  geom_boxplot()
+
+t.test(data = beta_temp, beta~Location.x)
+```
+
+# Beta Diversity for Ground Data
+
+## Sorensen's Index 
+
+* Use 'vegdist' function to find the Sorensen Values for each plot and calculate the mean
+
+```{r}
+ground_beta <- vegdist(ground_BCI, binary=TRUE)
+
+# Reshape the beta diversity matrix from wide to long format
+ground_beta_mat <- as.matrix(ground_beta)
+ground_beta_mat[!lower.tri(ground_beta_mat)] <- NA
+ground_beta_df <- as.data.frame(ground_beta_mat)
+ground_beta_df$plot1 <- row.names(ground_beta_df)
+ground_beta_df_long <- gather(ground_beta_df, "plot2", "ground_beta", 1:60)
+ground_beta_df_long <- filter(ground_beta_df_long, !is.na(ground_beta))
+
+# Merge beta_df_long with data.frame columns for plot characteristics
+ground_beta_df_long <- inner_join(ground_beta_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot1" = "Plot_Num"))
+ground_beta_df_long <- inner_join(ground_beta_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot2" = "Plot_Num"))
+
+```
+
+```{r}
+ggplot(data = filter(ground_beta_df_long, Site.x == Site.y), aes(x = Site.x, y = ground_beta)) +
+  geom_boxplot()
+```
+
+Use a simple t-test to see if there are significant differences in turnover among plots between sites
+
+```{r}
+ground_beta_temp <- filter(ground_beta_df_long, Site.x == Site.y)
+t.test(data = ground_beta_temp, ground_beta~Site.x)
+```
+
+From the above, we see that turn-over is  at Rockefeller than Teatown.
+
+Now let's look for differences also based on edge vs interior
+
+```{r}
+ground_beta_temp <- filter(ground_beta_df_long, Site.x == Site.y, Location.x == Location.y)
+ggplot(data = ground_beta_temp, aes(x = Site.x, y = ground_beta, fill = Location.x)) +
+  geom_boxplot()
+
+```
+
+Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
+
+```{r}
+kable(anova(lm(data = ground_beta_temp, ground_beta ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Sorensen's For Total Ground Vegetation")
+```
+
+Now let's check turn-over between edges and interiors
+
+```{r}
+ground_beta_temp <- filter(ground_beta_df_long, Site.x == Site.y, Location.x != Location.y)
+ggplot(data = ground_beta_temp, aes(x = Site.x, y = ground_beta)) +
+  geom_boxplot()
+
+t.test(data = ground_beta_temp, ground_beta~Site.x)
+
+```
+
+OK, so this suggests that the differences between edge and interior plots is greater at Rockefeller than at Teatown.
+
+This might actually be an indication of edge effects at Rockefeller
+
+
+Sites different, Location the same
+
+```{r}
+ground_beta_temp <- filter(ground_beta_df_long, Site.x != Site.y, Location.x == Location.y)
+ggplot(data = ground_beta_temp, aes(x = Location.x, y = ground_beta)) +
+  geom_boxplot()
+
+t.test(data = ground_beta_temp, ground_beta~Location.x)
+
+```
+
+## Bray-Curtis
+
+* Use `vegdist` function to find Bray-Curtis dissimilarity values for ground vegetation
+
+```{r}
+ground_beta_bray <- vegdist(ground_BCI, method = "bray")
+
+# Reshape the beta diversity matrix from wide to long format
+ground_beta_bray_mat <- as.matrix(ground_beta_bray)
+ground_beta_bray_mat[!lower.tri(ground_beta_bray_mat)] <- NA
+ground_beta_bray_df <- as.data.frame(ground_beta_bray_mat)
+ground_beta_bray_df$plot1 <- row.names(ground_beta_bray_df)
+ground_beta_bray_df_long <- gather(ground_beta_bray_df, "plot2", "ground_beta_bray", 1:60)
+ground_beta_bray_df_long <- filter(ground_beta_bray_df_long, !is.na(ground_beta_bray))
+
+# Merge ground_beta_bray_df_long with data.frame columns for plot characteristics
+ground_beta_bray_df_long <- inner_join(ground_beta_bray_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot1" = "Plot_Num"))
+ground_beta_bray_df_long <- inner_join(ground_beta_bray_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot2" = "Plot_Num"))
+
+```
+
+```{r}
+ggplot(data = filter(ground_beta_bray_df_long, Site.x == Site.y), aes(x = Site.x, y = ground_beta_bray)) +
+  geom_boxplot()
+```
+
+Use a simple t-test to see if there are significant differences in turnover among plots between sites
+
+```{r}
+ground_beta_bray_temp <- filter(ground_beta_bray_df_long, Site.x == Site.y)
+t.test(data = ground_beta_bray_temp, ground_beta_bray~Site.x)
+```
+
+Now let's look for differences also based on edge vs interior
+
+```{r}
+ground_beta_bray_temp <- filter(ground_beta_bray_df_long, Site.x == Site.y, Location.x == Location.y)
+ggplot(data = ground_beta_bray_temp, aes(x = Site.x, y = ground_beta_bray, fill = Location.x)) +
+  geom_boxplot()
+
+```
+
+Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
+
+```{r}
+kable(anova(lm(data = ground_beta_bray_temp, ground_beta_bray ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Bray-Curtis of Total Ground Vegetation")
+```
+
+Now let's check turn-over between edges and interiors
+
+```{r}
+ground_beta_bray_temp <- filter(ground_beta_bray_df_long, Site.x == Site.y, Location.x != Location.y)
+ggplot(data = ground_beta_bray_temp, aes(x = Site.x, y = ground_beta_bray)) +
+  geom_boxplot()
+
+t.test(data = ground_beta_bray_temp, ground_beta_bray~Site.x)
+
+```
+
+```{r}
+ground_beta_temp <- filter(ground_beta_df_long, Site.x != Site.y, Location.x == Location.y)
+ggplot(data = ground_beta_temp, aes(x = Location.x, y = ground_beta)) +
+  geom_boxplot()
+
+t.test(data = ground_beta_temp, ground_beta~Location.x)
+```
+
+# Beta Diversity for Native Gound Data
+
+## Sorensen's Index 
+
+* Use 'vegdist' function to find the Sorensen Values for each plot and calculate the mean
+
+```{r}
+native_ground_beta <- vegdist(native_ground_BCI, binary=TRUE)
+
+# Reshape the beta diversity matrix from wide to long format
+native_ground_beta_mat <- as.matrix(native_ground_beta)
+native_ground_beta_mat[!lower.tri(native_ground_beta_mat)] <- NA
+native_ground_beta_df <- as.data.frame(native_ground_beta_mat)
+native_ground_beta_df$plot1 <- row.names(native_ground_beta_df)
+native_ground_beta_df_long <- gather(native_ground_beta_df, "plot2", "native_ground_beta", 1:60)
+native_ground_beta_df_long <- filter(native_ground_beta_df_long, !is.na(native_ground_beta))
+
+# Merge beta_df_long with data.frame columns for plot characteristics
+native_ground_beta_df_long <- inner_join(native_ground_beta_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot1" = "Plot_Num"))
+native_ground_beta_df_long <- inner_join(native_ground_beta_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot2" = "Plot_Num"))
+
+
+```
+
+```{r}
+ggplot(data = filter(native_ground_beta_df_long, Site.x == Site.y), aes(x = Site.x, y = native_ground_beta)) +
+  geom_boxplot()
+```
+
+Use a simple t-test to see if there are significant differences in turnover among plots between sites
+
+```{r}
+native_ground_beta_temp <- filter(native_ground_beta_df_long, Site.x == Site.y)
+t.test(data = native_ground_beta_temp, native_ground_beta~Site.x)
+```
+
+From the above, we see that turn-over is significantly greater at Rockefeller than Teatown.
+
+Now let's look for differences also based on edge vs interior
+
+```{r}
+native_ground_beta_temp <- filter(native_ground_beta_df_long, Site.x == Site.y, Location.x == Location.y)
+ggplot(data = native_ground_beta_temp, aes(x = Site.x, y = native_ground_beta, fill = Location.x)) +
+  geom_boxplot()
+
+```
+
+Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
+
+```{r}
+kable(anova(lm(data = native_ground_beta_temp, native_ground_beta ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Sorensen's for Native Ground Vegetation")
+```
+
+Now let's check turn-over between edges and interiors
+
+```{r}
+native_ground_beta_temp <- filter(native_ground_beta_df_long, Site.x == Site.y, Location.x != Location.y)
+ggplot(data = native_ground_beta_temp, aes(x = Site.x, y = native_ground_beta)) +
+  geom_boxplot()
+
+t.test(data = native_ground_beta_temp, native_ground_beta~Site.x)
+
+```
+
+Sites different, Location the same
+
+```{r}
+native_ground_beta_temp <- filter(native_ground_beta_df_long, Site.x != Site.y, Location.x == Location.y)
+ggplot(data = native_ground_beta_temp, aes(x = Location.x, y = native_ground_beta)) +
+  geom_boxplot()
+
+t.test(data = native_ground_beta_temp, native_ground_beta~Location.x)
+
+```
+
+## Bray-Curtis
+
+* Use `vegdist` function to find Bray-Curtis dissimilarity values for ground vegetation
+
+```{r}
+native_ground_beta_bray <- vegdist(native_ground_BCI, method = "bray")
+
+# Reshape the beta diversity matrix from wide to long format
+native_ground_beta_bray_mat <- as.matrix(native_ground_beta_bray)
+native_ground_beta_bray_mat[!lower.tri(native_ground_beta_bray_mat)] <- NA
+native_ground_beta_bray_df <- as.data.frame(native_ground_beta_bray_mat)
+native_ground_beta_bray_df$plot1 <- row.names(native_ground_beta_bray_df)
+native_ground_beta_bray_df_long <- gather(native_ground_beta_bray_df, "plot2", "native_ground_beta_bray", 1:60)
+native_ground_beta_bray_df_long <- filter(native_ground_beta_bray_df_long, !is.na(native_ground_beta_bray))
+
+# Merge native_ground_beta_bray_df_long with data.frame columns for plot characteristics
+native_ground_beta_bray_df_long <- inner_join(native_ground_beta_bray_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot1" = "Plot_Num"))
+native_ground_beta_bray_df_long <- inner_join(native_ground_beta_bray_df_long, select(canopy_dens, Site:EcoCondition), by = c("plot2" = "Plot_Num"))
+
+```
+
+```{r}
+ggplot(data = filter(native_ground_beta_bray_df_long, Site.x == Site.y), aes(x = Site.x, y = native_ground_beta_bray)) +
+  geom_boxplot()
+```
+
+Use a simple t-test to see if there are significant differences in turnover among plots between sites
+
+```{r}
+native_ground_beta_bray_temp <- filter(native_ground_beta_bray_df_long, Site.x == Site.y)
+t.test(data = native_ground_beta_bray_temp, native_ground_beta_bray~Site.x)
+```
+
+Now let's look for differences also based on edge vs interior
+
+```{r}
+native_ground_beta_bray_temp <- filter(native_ground_beta_bray_df_long, Site.x == Site.y, Location.x == Location.y)
+ggplot(data = native_ground_beta_bray_temp, aes(x = Site.x, y = native_ground_beta_bray, fill = Location.x)) +
+  geom_boxplot()
+```
+
+Perform an ANOVA on these data to see if there's a difference between sites and edge/interior
+
+```{r}
+kable(anova(lm(data = native_ground_beta_bray_temp, native_ground_beta_bray ~ Site.x * Location.x)), digits = 3, format = "pandoc", caption = "ANOVA table of Bray-Curtis for Native Ground Vegetation")
+```
+
+Now let's check turn-over between edges and interiors
+
+```{r}
+native_ground_beta_bray_temp <- filter(native_ground_beta_bray_df_long, Site.x == Site.y, Location.x != Location.y)
+ggplot(data = native_ground_beta_bray_temp, aes(x = Site.x, y = native_ground_beta_bray)) +
+  geom_boxplot()
+
+
+t.test(data = native_ground_beta_bray_temp, native_ground_beta_bray~Site.x)
+```
+
+```{r}
+native_ground_beta_bray_temp <- filter(native_ground_beta_bray_df_long, Site.x != Site.y, Location.x == Location.y)
+ggplot(data = native_ground_beta_bray_temp, aes(x = Location.x, y = native_ground_beta_bray)) +
+  geom_boxplot()
+
+t.test(data = native_ground_beta_bray_temp, native_ground_beta_bray~Location.x)
+```
+
+```{r}
+citation()
+citation("tidyverse")
+citation("tidyr")
+citation("dplyr")
+citation("vegan")
+
+```
+
