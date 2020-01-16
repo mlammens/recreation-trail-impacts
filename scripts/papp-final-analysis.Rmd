@@ -105,6 +105,13 @@ papp_trees <- left_join(papp_trees, papp_species, by = "Species")
 # Change order of ecological conditions
 papp_trees$EcoCondition <- factor(papp_trees$EcoCondition, 
                                    levels = c("Disturbed", "Undisturbed", "Ecologically Significant"))
+
+# Calculate the number of trees per plot
+papp_trees_summary <- 
+  papp_trees %>%
+  group_by(Site, Plot_Num, Location, EcoCondition) %>%
+  summarise(Canopy_Density = unique(Canopy_Density),
+            Num_Trees = length(Species))
 ```
 
 ## Visualizing the Data
@@ -122,6 +129,22 @@ ggplot(data = papp_trees, aes(x = Location, y = DBH, fill = EcoCondition)) +
   theme_bw(base_family = "Times")
 ggsave("../manuscript/figures/Figure-4-DBH-Loc-Site.tiff", device = "tiff", width = 6.5, height = 4, units = "in")
 ```
+
+* Plot the number of trees versus the density
+
+```{r}
+ggplot(data = papp_trees_summary, aes(x = Num_Trees, y = Canopy_Density, color = EcoCondition)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_grid(Site~Location) +
+  ylab("Canopy Density") + 
+  scale_fill_discrete(name = "Ecological\nCondition",
+                      breaks = c("Disturbed", "Undisturbed", "Ecologically Significant"),
+                      labels = c("Disturbed", "Undisturbed", "Ecologically\nSignificant")) +
+  theme_bw(base_family = "Times")
+
+```
+
 
 ## Analysis of Variance
 
