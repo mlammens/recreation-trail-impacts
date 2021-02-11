@@ -1,0 +1,20 @@
+---
+title: "Project Log"
+author: "Matthew E. Aiello-Lammens"
+output: html_document
+---
+
+# Action Items
+
+* Plan to hire students for late Spring / early Summer to carry out field vegetation plots 
+* Contact three sites where vegetation plots can be carried out
+
+# 2021-02-11
+
+MAL: Conversation with Budd Veverka of Mianus River Gorge regarding overlap between our current recreation trail impacts project and his trail camera project. 
+MRG project - cameras at trail edge, in 50 m from the trail, and in 200 m from trail; at MRG, WPRR, and TLR.
+At each site they have deployed three sets of cameras.
+
+Our project to-date has involved vegetation plots at Rockefeller SPP and TLR, at trail edge and 50 m from the trail during late spring / early summer 2019, with 15 sets of plot pairs at each preserve (see Mathyas Papp thesis) and work carried out during ENV 498: Capstone project course with Mike Rubbo during Fall 2020. During that course, we collected information from paired vegetation plots (same structure as Papp work) at five locations per preserve at WPRR, TLR, and Kitchawan Preserve (KP).
+
+A plan for future collaboration between the MRG project and our project is to collect vegetation plot data at the locations of camera traps established by the MRG project.
